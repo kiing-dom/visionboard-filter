@@ -12,8 +12,8 @@ export function ToleranceSlider({
   hidden,
 }: ToleranceSliderProps) {
   return (
-    <label className="flex items-center gap-3 text-sm">
-      <span className="opacity-60">Minimum match</span>
+    <label className="flex items-center tracking-sm gap-3 text-sm">
+      <span className="opacity-60">minimum match</span>
       <input
         type="range"
         min={0}
@@ -21,7 +21,7 @@ export function ToleranceSlider({
         step={1}
         value={Math.round(value * 100)}
         onChange={(event) => onChange(Number(event.target.value) / 100)}
-        className="h-1 w-40 cursor-pointer accent-blue-500"
+        className="h-1 w-40 cursor-pointer accent-[#1c1c1c]"
       />
       <span className="w-10 font-mono tabular-nums">
         {Math.round(value * 100)}%

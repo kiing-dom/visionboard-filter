@@ -71,7 +71,7 @@ export function ImageImporter({ onImport, disabled }: ImageImporterProps) {
       }}
       onDrop={handleDrop}
       className={`flex flex-wrap items-center gap-3 rounded-lg border-2 border-dashed p-3 transition-colors ${
-        isDraggedOver ? "border-blue-500 bg-blue-50" : "border-black/10"
+        isDraggedOver ? "border-[#1c1c1c] bg-black/[0.03]" : "border-black/10"
       }`}
     >
       <input

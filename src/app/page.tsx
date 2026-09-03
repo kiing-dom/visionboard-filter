@@ -106,7 +106,7 @@ export default function Home() {
               onClick={() => setSelectedIds(new Set())}
               className="font-medium underline underline-offset-4 opacity-70 hover:opacity-100"
             >
-              Clear selection
+              clear selection
             </button>
           )}
         </div>

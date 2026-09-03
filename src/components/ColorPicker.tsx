@@ -64,7 +64,7 @@ export function ColorPicker({ colors, onChange }: ColorPickerProps) {
           placeholder="#C9B79C"
           aria-label="Add a target colour"
           aria-invalid={invalid}
-          className={`w-28 rounded-md border px-2 py-1.5 font-mono text-sm outline-none focus:border-blue-500 ${
+          className={`w-28 rounded-md border px-2 py-1.5 font-mono text-sm outline-none focus:border-[#1c1c1c] ${
             invalid ? "border-red-500" : "border-black/15"
           }`}
         />

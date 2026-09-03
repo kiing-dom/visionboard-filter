@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { rgbToHex } from "@/lib/colors";
+import { isLight, rgbToHex } from "@/lib/colors";
 import type { IndexedImage } from "@/types/image";
 
 interface ImageCardProps {
@@ -44,7 +44,7 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
       title={image.fileName}
       className={`group relative block aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
         selected
-          ? "border-blue-500"
+          ? "border-[#1c1c1c]"
           : "border-transparent hover:border-black/20"
       }`}
     >
@@ -65,8 +65,19 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
       )}
 
       {image.dominantColors.length > 0 && (
-        // Taller on hover so the individual swatches are easy to hit.
-        <span className="absolute inset-x-0 top-0 flex h-1.5 transition-all group-hover:h-4">
+        // Taller on hover so the individual swatches are easy to hit. The
+        // ring and shadow keep the strip readable as a strip even when its
+        // colours are drawn from — and so blend into — the image beneath.
+        <span
+          className="absolute inset-x-0 top-0 flex h-2 transition-all group-hover:h-4"
+          style={{
+            // An inline shadow rather than a utility: it must render whatever
+            // the image beneath it looks like, and a light inner line plus a
+            // dark outer one reads against both pale and dark photographs.
+            boxShadow:
+              "inset 0 0 0 1px rgba(255,255,255,0.35), 0 1px 4px rgba(0,0,0,0.55)",
+          }}
+        >
           {image.dominantColors.map((entry, i) => {
             const hex = rgbToHex(entry.color);
             const share = Math.round(entry.weight * 100);
@@ -74,7 +85,13 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
             return (
               <span
                 key={`${hex}-${i}`}
-                className="group/swatch relative h-full"
+                className={`group/swatch relative h-full ${
+                  // A hairline between neighbours, keyed to each swatch's own
+                  // lightness so adjacent similar colours stay separable.
+                  isLight(entry.color)
+                    ? "border-r border-black/25 last:border-r-0"
+                    : "border-r border-white/30 last:border-r-0"
+                }`}
                 style={{ backgroundColor: hex, width: `${entry.weight * 100}%` }}
               >
                 {/* The strip is only a few pixels tall, so an invisible pad
@@ -83,8 +100,14 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
 
                 <span
                   role="tooltip"
-                  className="pointer-events-none absolute left-1/2 top-full z-10 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded bg-black/85 px-1.5 py-1 font-mono text-[10px] leading-none text-white opacity-0 transition-opacity group-hover/swatch:opacity-100"
+                  className="pointer-events-none absolute left-1/2 top-full z-10 flex -translate-x-1/2 translate-y-1 items-center gap-1.5 whitespace-nowrap rounded border border-white/15 bg-[#1c1c1c] px-1.5 py-1 font-mono text-[10px] leading-none text-white opacity-0 shadow-md transition-opacity group-hover/swatch:opacity-100"
                 >
+                  {/* Repeat the colour in the tooltip, so the reading is tied
+                      to a swatch even when the strip is a thin band. */}
+                  <span
+                    className="h-2.5 w-2.5 rounded-xs ring-1 ring-white/25"
+                    style={{ backgroundColor: hex }}
+                  />
                   {hex} · {share}%
                 </span>
               </span>
@@ -94,7 +117,7 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
       )}
 
       {selected && (
-        <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[11px] font-bold text-white">
+        <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#1c1c1c] text-[11px] font-bold text-white">
           ✓
         </span>
       )}
