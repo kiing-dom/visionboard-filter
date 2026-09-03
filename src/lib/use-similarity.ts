@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cosineSimilarity } from "./embeddings";
+import { normaliseScores } from "./similarity";
 import type {
   EmbedRequest,
   EmbedResponse,
@@ -11,6 +12,8 @@ import type { IndexedImage } from "@/types/image";
 export interface SimilarityState {
   /** Id of the image being compared against, if any. */
   sourceId: string | null;
+  /** The active text query, if the search came from the search bar. */
+  query: string | null;
   /** Score per image id, once computed. */
   scores: ReadonlyMap<string, number>;
   /** How many images still need embedding. */
@@ -27,6 +30,7 @@ export interface SimilarityState {
  */
 export function useSimilarity(images: IndexedImage[]) {
   const [sourceId, setSourceId] = useState<string | null>(null);
+  const [query, setQuery] = useState<string | null>(null);
   const [scores, setScores] = useState<ReadonlyMap<string, number>>(
     () => new Map(),
   );
@@ -46,19 +50,13 @@ export function useSimilarity(images: IndexedImage[]) {
 
   const clear = useCallback(() => {
     setSourceId(null);
+    setQuery(null);
     setScores(new Map());
     setError(null);
   }, []);
 
-  const findSimilar = useCallback(async (id: string) => {
-    const all = images.filter((image) => image.file);
-    const source = all.find((image) => image.id === id);
-    if (!source) return;
-
-    setSourceId(id);
-    setError(null);
-    setScores(new Map());
-
+  /** Ensures every image has an embedding, reporting progress as it goes. */
+  const embedAll = useCallback(async (all: IndexedImage[]) => {
     if (!workerRef.current) {
       workerRef.current = new Worker(
         new URL("@/workers/embedding-worker.ts", import.meta.url),
@@ -67,63 +65,137 @@ export function useSimilarity(images: IndexedImage[]) {
     }
     const worker = workerRef.current;
 
-    const missing = all.filter(
-      (image) => !embeddingsRef.current.has(image.id),
-    );
+    const missing = all.filter((image) => !embeddingsRef.current.has(image.id));
     setPending(missing.length);
-    // The download only happens on the very first request.
+    // The model download only happens on the very first request.
     setLoadingModel(embeddingsRef.current.size === 0 && missing.length > 0);
 
-    try {
-      for (const image of missing) {
-        const embedding = await embedInWorker(worker, {
-          id: image.id,
-          file: image.file!,
-        });
+    for (const image of missing) {
+      const embedding = await embedInWorker(worker, {
+        id: image.id,
+        kind: "image",
+        file: image.file!,
+      });
 
-        if (embedding) embeddingsRef.current.set(image.id, embedding);
+      if (embedding) embeddingsRef.current.set(image.id, embedding);
+      setLoadingModel(false);
+      setPending((count) => Math.max(0, count - 1));
+    }
+
+    return worker;
+  }, []);
+
+  const findSimilar = useCallback(
+    async (id: string) => {
+      const all = images.filter((image) => image.file);
+      if (!all.some((image) => image.id === id)) return;
+
+      setSourceId(id);
+      setQuery(null);
+      setError(null);
+      setScores(new Map());
+
+      try {
+        await embedAll(all);
+
+        const reference = embeddingsRef.current.get(id);
+        if (!reference) {
+          setError("Could not embed the selected image.");
+          return;
+        }
+
+        // Image-to-image scores already span a usable range, so they are
+        // shown as-is; only cross-modal scores need rescaling.
+        setScores(
+          new Map(
+            all
+              .map((image): [string, number] => {
+                const vector = embeddingsRef.current.get(image.id);
+                return [
+                  image.id,
+                  vector ? cosineSimilarity(reference, vector) : 0,
+                ];
+              })
+              .filter(([, score]) => score > 0),
+          ),
+        );
+      } catch (caught) {
+        setError(
+          caught instanceof Error ? caught.message : "Similarity search failed.",
+        );
+      } finally {
+        setPending(0);
         setLoadingModel(false);
-        setPending((count) => Math.max(0, count - 1));
       }
+    },
+    [images, embedAll],
+  );
 
-      const reference = embeddingsRef.current.get(id);
-      if (!reference) {
-        setError("Could not embed the selected image.");
+  const search = useCallback(
+    async (phrase: string) => {
+      const trimmed = phrase.trim();
+      if (trimmed === "") {
+        clear();
         return;
       }
 
-      setScores(
-        new Map(
+      const all = images.filter((image) => image.file);
+      if (all.length === 0) return;
+
+      setQuery(trimmed);
+      setSourceId(null);
+      setError(null);
+      setScores(new Map());
+
+      try {
+        const worker = await embedAll(all);
+
+        const queryVector = await embedInWorker(worker, {
+          id: `query:${trimmed}`,
+          kind: "text",
+          query: trimmed,
+        });
+
+        if (!queryVector) {
+          setError("Could not understand that search.");
+          return;
+        }
+
+        const raw = new Map(
           all
             .map((image): [string, number] => {
               const vector = embeddingsRef.current.get(image.id);
               return [
                 image.id,
-                vector ? cosineSimilarity(reference, vector) : 0,
+                vector ? cosineSimilarity(queryVector, vector) : 0,
               ];
             })
-            .filter(([, score]) => score > 0),
-        ),
-      );
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Similarity search failed.",
-      );
-    } finally {
-      setPending(0);
-      setLoadingModel(false);
-    }
-  }, [images]);
+            .filter(([, score]) => score !== 0),
+        );
+
+        // Rescaled: raw text-image scores all sit around 0.2-0.3, so the
+        // best match would otherwise read as a poor one.
+        setScores(normaliseScores(raw));
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Search failed.");
+      } finally {
+        setPending(0);
+        setLoadingModel(false);
+      }
+    },
+    [images, embedAll, clear],
+  );
 
   const state: SimilarityState = {
     sourceId,
+    query,
     scores,
     pending,
     loadingModel,
     error,
   };
 
-  return { ...state, findSimilar, clear };
+  return { ...state, findSimilar, search, clear };
 }
 
 function embedInWorker(

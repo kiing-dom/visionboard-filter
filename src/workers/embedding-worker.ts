@@ -1,11 +1,10 @@
 /// <reference lib="webworker" />
 
-import { embedImage } from "@/lib/embeddings";
+import { embedImage, embedText } from "@/lib/embeddings";
 
-export interface EmbedRequest {
-  id: string;
-  file: Blob;
-}
+export type EmbedRequest =
+  | { id: string; kind: "image"; file: Blob }
+  | { id: string; kind: "text"; query: string };
 
 export type EmbedResponse =
   | { id: string; ok: true; embedding: number[] }
@@ -16,10 +15,15 @@ export type EmbedResponse =
  * the grid. The first message pays the download; later ones are fast.
  */
 self.onmessage = async (event: MessageEvent<EmbedRequest>) => {
-  const { id, file } = event.data;
+  const request = event.data;
+  const { id } = request;
 
   try {
-    const embedding = await embedImage(file);
+    const embedding =
+      request.kind === "image"
+        ? await embedImage(request.file)
+        : await embedText(request.query);
+
     self.postMessage({ id, ok: true, embedding } satisfies EmbedResponse);
   } catch (error) {
     self.postMessage({

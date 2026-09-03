@@ -31,3 +31,33 @@ export function paletteScore(
 
   return scores.reduce((total, score) => total + score, 0) / scores.length;
 }
+
+/**
+ * CLIP's text and image embeddings sit in a shared space but not on top of
+ * each other: even a perfect textual match scores only ~0.3, and every score
+ * for one query lands in a narrow band. Shown raw, the best possible hit
+ * would read as "30% match".
+ *
+ * So semantic scores are rescaled against the range this query actually
+ * produced — the strongest match becomes 1, the weakest 0. That makes the
+ * ordering legible without implying a precision the raw numbers don't carry.
+ */
+export function normaliseScores(
+  scores: ReadonlyMap<string, number>,
+): Map<string, number> {
+  const values = [...scores.values()];
+  if (values.length === 0) return new Map();
+
+  const lowest = Math.min(...values);
+  const highest = Math.max(...values);
+  const span = highest - lowest;
+
+  // Every image scored identically; treat them all as equally good.
+  if (span < 1e-6) {
+    return new Map([...scores.keys()].map((id) => [id, 1]));
+  }
+
+  return new Map(
+    [...scores].map(([id, score]) => [id, (score - lowest) / span]),
+  );
+}

@@ -5,6 +5,7 @@ import { ColorColumns } from "@/components/ColorColumns";
 import { ColorPicker } from "@/components/ColorPicker";
 import { ImageGrid } from "@/components/ImageGrid";
 import { ImageImporter } from "@/components/ImageImporter";
+import { SearchBar } from "@/components/SearchBar";
 import { ToleranceSlider } from "@/components/ToleranceSlider";
 import { paletteScore } from "@/lib/similarity";
 import { useAnalysis } from "@/lib/use-analysis";
@@ -69,16 +70,18 @@ export default function Home() {
   // reference image and by colour at the same time would be two orderings of
   // one list.
   const similar = useMemo(() => {
-    if (!similarity.sourceId || similarity.scores.size === 0) return null;
+    const active = similarity.sourceId !== null || similarity.query !== null;
+    if (!active || similarity.scores.size === 0) return null;
 
     return images
       .map((image) => ({
         image,
         score: similarity.scores.get(image.id) ?? 0,
       }))
-      .filter(({ image, score }) => score > 0 && image.id !== similarity.sourceId)
+      .filter(({ image }) => image.id !== similarity.sourceId)
+      .filter(({ image }) => similarity.scores.has(image.id))
       .sort((a, b) => b.score - a.score);
-  }, [images, similarity.sourceId, similarity.scores]);
+  }, [images, similarity.sourceId, similarity.query, similarity.scores]);
 
   // How many image/colour pairings the threshold is excluding.
   const hiddenCount = useMemo(() => {
@@ -95,6 +98,14 @@ export default function Home() {
 
       <section className="flex flex-col gap-4">
         <ImageImporter onImport={handleImport} />
+        {images.length > 0 && (
+          <SearchBar
+            onSearch={similarity.search}
+            onClear={similarity.clear}
+            active={similarity.query}
+            busy={similarity.pending > 0 || similarity.loadingModel}
+          />
+        )}
         {images.length > 0 && (
           <ColorPicker colors={targetColors} onChange={setTargetColors} />
         )}
@@ -121,9 +132,12 @@ export default function Home() {
             {!similarity.loadingModel &&
               similarity.pending > 0 &&
               ` · embedding ${similarity.pending}…`}
-            {similar && " · ranked by visual similarity"}
+            {similar &&
+              (similarity.query
+                ? ` · matching “${similarity.query}”`
+                : " · ranked by visual similarity")}
           </span>
-          {similarity.sourceId && (
+          {(similarity.sourceId || similarity.query) && (
             <button
               type="button"
               onClick={similarity.clear}
