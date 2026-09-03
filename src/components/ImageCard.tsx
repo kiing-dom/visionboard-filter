@@ -10,9 +10,20 @@ interface ImageCardProps {
   onToggle: (id: string) => void;
   /** Colour-match score, 0-1. Omitted when no target colours are set. */
   score?: number;
+  /** Omitted when visual similarity isn't available for this view. */
+  onFindSimilar?: (id: string) => void;
+  /** Marks the image the current similarity search started from. */
+  isSimilaritySource?: boolean;
 }
 
-export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) {
+export function ImageCard({
+  image,
+  selected,
+  onToggle,
+  score,
+  onFindSimilar,
+  isSimilaritySource,
+}: ImageCardProps) {
   const file = image.file;
 
   /**
@@ -37,17 +48,25 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
   );
 
   return (
-    <button
-      type="button"
-      onClick={() => onToggle(image.id)}
-      aria-pressed={selected}
+    <div
       title={image.fileName}
       className={`group relative block aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
         selected
           ? "border-[#1c1c1c]"
-          : "border-transparent hover:border-black/20"
+          : isSimilaritySource
+            ? "border-black/40"
+            : "border-transparent hover:border-black/20"
       }`}
     >
+      {/* Fills the card so the whole thumbnail toggles selection; the palette
+          strip and action button sit above it. */}
+      <button
+        type="button"
+        onClick={() => onToggle(image.id)}
+        aria-pressed={selected}
+        aria-label={`Select ${image.fileName}`}
+        className="absolute inset-0 z-0 cursor-pointer"
+      />
       {/* Local blob URL set via ref; next/image has nothing to optimize here. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -55,7 +74,7 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
         alt={image.fileName}
         loading="lazy"
         decoding="async"
-        className="h-full w-full bg-black/5 object-cover"
+        className="pointer-events-none h-full w-full bg-black/5 object-cover"
       />
 
       {score !== undefined && (
@@ -125,6 +144,16 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
       <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-4 text-left text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
         {image.fileName}
       </span>
-    </button>
+
+      {onFindSimilar && (
+        <button
+          type="button"
+          onClick={() => onFindSimilar(image.id)}
+          className="absolute bottom-2 right-2 z-10 cursor-pointer rounded border border-white/15 bg-[#1c1c1c] px-1.5 py-1 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          {isSimilaritySource ? "source" : "find similar"}
+        </button>
+      )}
+    </div>
   );
 }

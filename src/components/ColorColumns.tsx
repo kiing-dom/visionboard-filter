@@ -13,6 +13,8 @@ interface ColorColumnsProps {
   columns: { color: RGBColor; matches: ScoredImage[] }[];
   selectedIds: ReadonlySet<string>;
   onToggle: (id: string) => void;
+  onFindSimilar?: (id: string) => void;
+  similaritySourceId?: string | null;
 }
 
 /**
@@ -24,6 +26,8 @@ export function ColorColumns({
   columns,
   selectedIds,
   onToggle,
+  onFindSimilar,
+  similaritySourceId,
 }: ColorColumnsProps) {
   return (
     <div
@@ -61,6 +65,8 @@ export function ColorColumns({
                     selected={selectedIds.has(image.id)}
                     onToggle={onToggle}
                     score={score}
+                    onFindSimilar={onFindSimilar}
+                    isSimilaritySource={image.id === similaritySourceId}
                   />
                 ))}
               </div>

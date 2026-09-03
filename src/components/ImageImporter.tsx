@@ -71,7 +71,7 @@ export function ImageImporter({ onImport, disabled }: ImageImporterProps) {
       }}
       onDrop={handleDrop}
       className={`flex flex-wrap items-center gap-3 rounded-lg border-2 border-dashed p-3 transition-colors ${
-        isDraggedOver ? "border-[#1c1c1c] bg-black/[0.03]" : "border-black/10"
+        isDraggedOver ? "border-[#1c1c1c] bg-black/3" : "border-black/10"
       }`}
     >
       <input
@@ -98,20 +98,20 @@ export function ImageImporter({ onImport, disabled }: ImageImporterProps) {
         type="button"
         disabled={busy}
         onClick={() => fileInputRef.current?.click()}
-        className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50"
+        className="rounded-md border tracking-tight border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50"
       >
-        Select images
+        select images
       </button>
       <button
         type="button"
         disabled={busy}
         onClick={() => directoryInputRef.current?.click()}
-        className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50"
+        className="rounded-md border tracking-tight border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50"
       >
-        Select folder
+        select folder
       </button>
 
-      <span className="text-sm opacity-40">or drop images and folders here</span>
+      <span className="text-sm tracking-tight opacity-40">or drop images and folders here</span>
 
       {isReading && <span className="text-sm opacity-60">Reading images…</span>}
       {!isReading && skipped !== null && skipped > 0 && (

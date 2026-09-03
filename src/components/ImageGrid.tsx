@@ -9,9 +9,18 @@ interface ImageGridProps {
   onToggle: (id: string) => void;
   /** Score per image id; absent when no target colours are set. */
   scores?: ReadonlyMap<string, number>;
+  onFindSimilar?: (id: string) => void;
+  similaritySourceId?: string | null;
 }
 
-export function ImageGrid({ images, selectedIds, onToggle, scores }: ImageGridProps) {
+export function ImageGrid({
+  images,
+  selectedIds,
+  onToggle,
+  scores,
+  onFindSimilar,
+  similaritySourceId,
+}: ImageGridProps) {
   if (images.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-black/15 py-20 text-center">
@@ -32,6 +41,8 @@ export function ImageGrid({ images, selectedIds, onToggle, scores }: ImageGridPr
           selected={selectedIds.has(image.id)}
           onToggle={onToggle}
           score={scores?.get(image.id)}
+          onFindSimilar={onFindSimilar}
+          isSimilaritySource={image.id === similaritySourceId}
         />
       ))}
     </div>

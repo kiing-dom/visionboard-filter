@@ -8,6 +8,7 @@ import { ImageImporter } from "@/components/ImageImporter";
 import { ToleranceSlider } from "@/components/ToleranceSlider";
 import { paletteScore } from "@/lib/similarity";
 import { useAnalysis } from "@/lib/use-analysis";
+import { useSimilarity } from "@/lib/use-similarity";
 import type { IndexedImage, PaletteEntry, RGBColor } from "@/types/image";
 
 export default function Home() {
@@ -36,6 +37,7 @@ export default function Home() {
   }, []);
 
   const { pending } = useAnalysis(images, handleAnalysed);
+  const similarity = useSimilarity(images);
 
   const handleToggle = useCallback((id: string) => {
     setSelectedIds((current) => {
@@ -62,6 +64,21 @@ export default function Home() {
       }),
     [images, targetColors, tolerance],
   );
+
+  // While a similarity search is active it takes over the grid: ranking by a
+  // reference image and by colour at the same time would be two orderings of
+  // one list.
+  const similar = useMemo(() => {
+    if (!similarity.sourceId || similarity.scores.size === 0) return null;
+
+    return images
+      .map((image) => ({
+        image,
+        score: similarity.scores.get(image.id) ?? 0,
+      }))
+      .filter(({ image, score }) => score > 0 && image.id !== similarity.sourceId)
+      .sort((a, b) => b.score - a.score);
+  }, [images, similarity.sourceId, similarity.scores]);
 
   // How many image/colour pairings the threshold is excluding.
   const hiddenCount = useMemo(() => {
@@ -98,8 +115,23 @@ export default function Home() {
             {pending > 0 && ` · analysing ${pending}…`}
             {targetColors.length > 0 &&
               pending === 0 &&
+              !similar &&
               ` · ${targetColors.length} colour ${targetColors.length === 1 ? "column" : "columns"}`}
+            {similarity.loadingModel && " · loading model…"}
+            {!similarity.loadingModel &&
+              similarity.pending > 0 &&
+              ` · embedding ${similarity.pending}…`}
+            {similar && " · ranked by visual similarity"}
           </span>
+          {similarity.sourceId && (
+            <button
+              type="button"
+              onClick={similarity.clear}
+              className="mr-4 font-medium underline underline-offset-4 opacity-70 hover:opacity-100"
+            >
+              back to all
+            </button>
+          )}
           {selectedIds.size > 0 && (
             <button
               type="button"
@@ -112,18 +144,37 @@ export default function Home() {
         </div>
       )}
 
+      {similarity.error && (
+        <p className="rounded-md border border-black/15 bg-black/[0.03] px-3 py-2 text-sm">
+          {similarity.error}
+        </p>
+      )}
+
       <section className="flex-1">
-        {columns.length > 0 ? (
+        {similar ? (
+          <ImageGrid
+            images={similar.map((entry) => entry.image)}
+            selectedIds={selectedIds}
+            onToggle={handleToggle}
+            scores={new Map(similar.map((e) => [e.image.id, e.score]))}
+            onFindSimilar={similarity.findSimilar}
+            similaritySourceId={similarity.sourceId}
+          />
+        ) : columns.length > 0 ? (
           <ColorColumns
             columns={columns}
             selectedIds={selectedIds}
             onToggle={handleToggle}
+            onFindSimilar={similarity.findSimilar}
+            similaritySourceId={similarity.sourceId}
           />
         ) : (
           <ImageGrid
             images={images}
             selectedIds={selectedIds}
             onToggle={handleToggle}
+            onFindSimilar={similarity.findSimilar}
+            similaritySourceId={similarity.sourceId}
           />
         )}
       </section>
