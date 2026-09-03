@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vision Finder",
+  title: "vbf",
   description: "Find and organize images for vision boards — entirely in your browser.",
 };
 

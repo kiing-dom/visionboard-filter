@@ -1,15 +1,18 @@
 "use client";
 
 import { useCallback } from "react";
+import { rgbToHex } from "@/lib/colors";
 import type { IndexedImage } from "@/types/image";
 
 interface ImageCardProps {
   image: IndexedImage;
   selected: boolean;
   onToggle: (id: string) => void;
+  /** Colour-match score, 0-1. Omitted when no target colours are set. */
+  score?: number;
 }
 
-export function ImageCard({ image, selected, onToggle }: ImageCardProps) {
+export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) {
   const file = image.file;
 
   /**
@@ -42,7 +45,7 @@ export function ImageCard({ image, selected, onToggle }: ImageCardProps) {
       className={`group relative block aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
         selected
           ? "border-blue-500"
-          : "border-transparent hover:border-black/20 dark:hover:border-white/25"
+          : "border-transparent hover:border-black/20"
       }`}
     >
       {/* Local blob URL set via ref; next/image has nothing to optimize here. */}
@@ -52,8 +55,28 @@ export function ImageCard({ image, selected, onToggle }: ImageCardProps) {
         alt={image.fileName}
         loading="lazy"
         decoding="async"
-        className="h-full w-full bg-black/5 object-cover dark:bg-white/5"
+        className="h-full w-full bg-black/5 object-cover"
       />
+
+      {score !== undefined && (
+        <span className="absolute left-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
+          {Math.round(score * 100)}%
+        </span>
+      )}
+
+      {image.dominantColors.length > 0 && (
+        <span className="pointer-events-none absolute inset-x-0 top-0 flex h-1.5">
+          {image.dominantColors.map((entry, i) => (
+            <span
+              key={`${rgbToHex(entry.color)}-${i}`}
+              style={{
+                backgroundColor: rgbToHex(entry.color),
+                width: `${entry.weight * 100}%`,
+              }}
+            />
+          ))}
+        </span>
+      )}
 
       {selected && (
         <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[11px] font-bold text-white">
