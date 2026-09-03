@@ -90,3 +90,50 @@ export async function indexFiles(files: File[]): Promise<IndexedImage[]> {
 
   return results.filter((image): image is IndexedImage => image !== null);
 }
+
+/**
+ * A dropped folder arrives as a directory entry rather than a list of files,
+ * so it has to be walked. `webkitGetAsEntry` is non-standard but is what every
+ * current browser implements; without it we fall back to whatever loose files
+ * the drop provided.
+ */
+export async function filesFromDrop(dataTransfer: DataTransfer): Promise<File[]> {
+  const items = Array.from(dataTransfer.items).filter(
+    (item) => item.kind === "file",
+  );
+
+  const entries = items
+    .map((item) => item.webkitGetAsEntry?.() ?? null)
+    .filter((entry): entry is FileSystemEntry => entry !== null);
+
+  if (entries.length === 0) return Array.from(dataTransfer.files);
+
+  const collected = await Promise.all(entries.map(walkEntry));
+  return collected.flat();
+}
+
+async function walkEntry(entry: FileSystemEntry): Promise<File[]> {
+  if (entry.isFile) {
+    const file = await new Promise<File | null>((resolve) =>
+      (entry as FileSystemFileEntry).file(resolve, () => resolve(null)),
+    );
+    return file ? [file] : [];
+  }
+
+  if (!entry.isDirectory) return [];
+
+  const reader = (entry as FileSystemDirectoryEntry).createReader();
+  const children: FileSystemEntry[] = [];
+
+  // readEntries yields at most 100 per call, so it has to be drained.
+  while (true) {
+    const batch = await new Promise<FileSystemEntry[]>((resolve) =>
+      reader.readEntries(resolve, () => resolve([])),
+    );
+    if (batch.length === 0) break;
+    children.push(...batch);
+  }
+
+  const nested = await Promise.all(children.map(walkEntry));
+  return nested.flat();
+}

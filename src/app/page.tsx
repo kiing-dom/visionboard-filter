@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { ColorColumns } from "@/components/ColorColumns";
 import { ColorPicker } from "@/components/ColorPicker";
 import { ImageGrid } from "@/components/ImageGrid";
 import { ImageImporter } from "@/components/ImageImporter";
+import { ToleranceSlider } from "@/components/ToleranceSlider";
 import { paletteScore } from "@/lib/similarity";
 import { useAnalysis } from "@/lib/use-analysis";
 import type { IndexedImage, PaletteEntry, RGBColor } from "@/types/image";
@@ -14,6 +16,7 @@ export default function Home() {
     () => new Set(),
   );
   const [targetColors, setTargetColors] = useState<RGBColor[]>([]);
+  const [tolerance, setTolerance] = useState(0.4);
 
   const handleImport = useCallback((imported: IndexedImage[]) => {
     setImages((current) => {
@@ -42,23 +45,30 @@ export default function Home() {
     });
   }, []);
 
-  const scores = useMemo(() => {
-    if (targetColors.length === 0) return undefined;
-    return new Map(
-      images.map((image) => [
-        image.id,
-        paletteScore(image.dominantColors, targetColors),
-      ]),
-    );
-  }, [images, targetColors]);
+  // One column per target colour, each ranked by that colour alone. An image
+  // matching several colours appears in each of them.
+  const columns = useMemo(
+    () =>
+      targetColors.map((color) => {
+        const matches = images
+          .map((image) => ({
+            image,
+            score: paletteScore(image.dominantColors, [color]),
+          }))
+          .filter(({ score }) => score >= tolerance)
+          .sort((a, b) => b.score - a.score);
 
-  // Ranked when colours are set, import order otherwise.
-  const ordered = useMemo(() => {
-    if (!scores) return images;
-    return [...images].sort(
-      (a, b) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0),
-    );
-  }, [images, scores]);
+        return { color, matches };
+      }),
+    [images, targetColors, tolerance],
+  );
+
+  // How many image/colour pairings the threshold is excluding.
+  const hiddenCount = useMemo(() => {
+    if (targetColors.length === 0) return 0;
+    const shown = columns.reduce((total, c) => total + c.matches.length, 0);
+    return images.length * targetColors.length - shown;
+  }, [columns, images.length, targetColors.length]);
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
@@ -71,6 +81,13 @@ export default function Home() {
         {images.length > 0 && (
           <ColorPicker colors={targetColors} onChange={setTargetColors} />
         )}
+        {targetColors.length > 0 && (
+          <ToleranceSlider
+            value={tolerance}
+            onChange={setTolerance}
+            hidden={hiddenCount}
+          />
+        )}
       </section>
 
       {images.length > 0 && (
@@ -79,7 +96,9 @@ export default function Home() {
             {images.length} {images.length === 1 ? "image" : "images"}
             {selectedIds.size > 0 && ` · ${selectedIds.size} selected`}
             {pending > 0 && ` · analysing ${pending}…`}
-            {scores && pending === 0 && " · ranked by colour"}
+            {targetColors.length > 0 &&
+              pending === 0 &&
+              ` · ${targetColors.length} colour ${targetColors.length === 1 ? "column" : "columns"}`}
           </span>
           {selectedIds.size > 0 && (
             <button
@@ -94,12 +113,19 @@ export default function Home() {
       )}
 
       <section className="flex-1">
-        <ImageGrid
-          images={ordered}
-          selectedIds={selectedIds}
-          onToggle={handleToggle}
-          scores={scores}
-        />
+        {columns.length > 0 ? (
+          <ColorColumns
+            columns={columns}
+            selectedIds={selectedIds}
+            onToggle={handleToggle}
+          />
+        ) : (
+          <ImageGrid
+            images={images}
+            selectedIds={selectedIds}
+            onToggle={handleToggle}
+          />
+        )}
       </section>
     </main>
   );

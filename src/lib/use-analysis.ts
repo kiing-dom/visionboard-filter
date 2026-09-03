@@ -1,22 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { extractPalette } from "./palette";
-import { toAnalysisPixels } from "./image-processing";
+import { loadAnalyses, saveAnalysis } from "./storage";
+import type {
+  AnalyseRequest,
+  AnalyseResponse,
+} from "@/workers/image-worker";
 import type { IndexedImage, PaletteEntry } from "@/types/image";
 
-interface AnalysisTarget {
-  id: string;
-  file: Blob;
-}
-
 /**
- * Analyses images that have no palette yet, one at a time, yielding to the
- * event loop between images so the grid stays responsive. Still on the main
- * thread — Phase 3 moves it into a worker.
- *
- * The queue is keyed by id so images already analysed (or already failed) are
- * never revisited, and the effect re-runs only when the set of work changes.
+ * Analyses images that have no palette yet, one at a time in a worker, so
+ * clustering never blocks the grid. Results are cached in IndexedDB and
+ * restored on the next visit, so re-importing the same folder is instant.
  */
 export function useAnalysis(
   images: IndexedImage[],
@@ -24,58 +19,87 @@ export function useAnalysis(
 ) {
   const [done, setDone] = useState<ReadonlySet<string>>(() => new Set());
 
-  const targets: AnalysisTarget[] = images
-    .filter(
-      (image) =>
-        image.file !== undefined &&
-        image.dominantColors.length === 0 &&
-        !done.has(image.id),
-    )
-    .map((image) => ({ id: image.id, file: image.file! }));
+  const targets = images.filter(
+    (image) =>
+      image.file !== undefined &&
+      image.dominantColors.length === 0 &&
+      !done.has(image.id),
+  );
 
-  // Stable identity for the work set, so re-renders that don't change what
-  // needs analysing don't restart the queue.
+  // Stable identity for the work set, so renders that don't change what needs
+  // analysing don't restart the queue.
   const queueKey = targets.map((target) => target.id).join(",");
 
   useEffect(() => {
     if (queueKey === "") return;
 
     let cancelled = false;
-    const queue = queueKey.split(",");
-    const byId = new Map(targets.map((target) => [target.id, target.file]));
+    const byId = new Map(images.map((image) => [image.id, image]));
+    const worker = new Worker(
+      new URL("@/workers/image-worker.ts", import.meta.url),
+      { type: "module" },
+    );
 
     (async () => {
-      for (const id of queue) {
+      // Anything already analysed in a previous session skips the worker.
+      const cached = await loadAnalyses();
+      if (cancelled) return;
+
+      for (const id of queueKey.split(",")) {
         if (cancelled) return;
 
-        const file = byId.get(id);
-        if (file) {
-          try {
-            const pixels = await toAnalysisPixels(file);
-            if (cancelled) return;
-            onAnalysed(id, extractPalette(pixels));
-          } catch {
-            // Undecodable despite passing import. Mark it done so the queue
-            // doesn't retry it forever.
-          }
+        const image = byId.get(id);
+        if (!image?.file) continue;
+
+        const hit = cached.get(id);
+        if (hit && hit.dominantColors.length > 0) {
+          onAnalysed(id, hit.dominantColors);
+          setDone((current) => new Set(current).add(id));
+          continue;
         }
 
-        // Marking done also removes it from the next queue.
-        setDone((current) => new Set(current).add(id));
+        const palette = await analyseInWorker(worker, {
+          id,
+          file: image.file,
+        });
+        if (cancelled) return;
 
-        // Let the browser paint between images.
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (palette) {
+          onAnalysed(id, palette);
+          void saveAnalysis({ ...image, dominantColors: palette });
+        }
+
+        // Marked done either way, so a failure isn't retried forever.
+        setDone((current) => new Set(current).add(id));
       }
     })();
 
     return () => {
       cancelled = true;
+      worker.terminate();
     };
-    // `targets`/`onAnalysed` are derived from `queueKey`; depending on them
+    // `images`/`onAnalysed` are covered by `queueKey`; depending on them
     // directly would restart the queue on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queueKey]);
 
   // Derived rather than tracked: anything still queued is still pending.
   return { pending: targets.length };
+}
+
+function analyseInWorker(
+  worker: Worker,
+  request: AnalyseRequest,
+): Promise<PaletteEntry[] | null> {
+  return new Promise((resolve) => {
+    const handle = (event: MessageEvent<AnalyseResponse>) => {
+      if (event.data.id !== request.id) return;
+
+      worker.removeEventListener("message", handle);
+      resolve(event.data.ok ? event.data.palette : null);
+    };
+
+    worker.addEventListener("message", handle);
+    worker.postMessage(request);
+  });
 }

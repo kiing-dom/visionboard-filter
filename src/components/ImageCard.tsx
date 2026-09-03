@@ -65,16 +65,31 @@ export function ImageCard({ image, selected, onToggle, score }: ImageCardProps) 
       )}
 
       {image.dominantColors.length > 0 && (
-        <span className="pointer-events-none absolute inset-x-0 top-0 flex h-1.5">
-          {image.dominantColors.map((entry, i) => (
-            <span
-              key={`${rgbToHex(entry.color)}-${i}`}
-              style={{
-                backgroundColor: rgbToHex(entry.color),
-                width: `${entry.weight * 100}%`,
-              }}
-            />
-          ))}
+        // Taller on hover so the individual swatches are easy to hit.
+        <span className="absolute inset-x-0 top-0 flex h-1.5 transition-all group-hover:h-4">
+          {image.dominantColors.map((entry, i) => {
+            const hex = rgbToHex(entry.color);
+            const share = Math.round(entry.weight * 100);
+
+            return (
+              <span
+                key={`${hex}-${i}`}
+                className="group/swatch relative h-full"
+                style={{ backgroundColor: hex, width: `${entry.weight * 100}%` }}
+              >
+                {/* The strip is only a few pixels tall, so an invisible pad
+                    below each swatch gives the pointer something to land on. */}
+                <span className="absolute inset-x-0 top-0 h-5" />
+
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute left-1/2 top-full z-10 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded bg-black/85 px-1.5 py-1 font-mono text-[10px] leading-none text-white opacity-0 transition-opacity group-hover/swatch:opacity-100"
+                >
+                  {hex} · {share}%
+                </span>
+              </span>
+            );
+          })}
         </span>
       )}
 
