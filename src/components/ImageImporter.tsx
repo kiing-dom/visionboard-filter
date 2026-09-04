@@ -98,7 +98,7 @@ export function ImageImporter({ onImport, disabled }: ImageImporterProps) {
         type="button"
         disabled={busy}
         onClick={() => fileInputRef.current?.click()}
-        className="rounded-md border tracking-tight border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50"
+        className="rounded-md border tracking-tight border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:cursor-pointer hover:bg-black/5 disabled:opacity-50"
       >
         select images
       </button>
@@ -106,7 +106,7 @@ export function ImageImporter({ onImport, disabled }: ImageImporterProps) {
         type="button"
         disabled={busy}
         onClick={() => directoryInputRef.current?.click()}
-        className="rounded-md border tracking-tight border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50"
+        className="rounded-md border tracking-tight border-black/15 px-3 py-1.5 text-sm font-medium transition-colors hover:cursor-pointer hover:bg-black/5 disabled:opacity-50"
       >
         select folder
       </button>

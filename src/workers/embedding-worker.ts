@@ -1,10 +1,8 @@
 /// <reference lib="webworker" />
 
-import { embedImage, embedText } from "@/lib/embeddings";
+import { embedImage } from "@/lib/embeddings";
 
-export type EmbedRequest =
-  | { id: string; kind: "image"; file: Blob }
-  | { id: string; kind: "text"; query: string };
+export type EmbedRequest = { id: string; kind: "image"; file: Blob };
 
 export type EmbedResponse =
   | { id: string; ok: true; embedding: number[] }
@@ -19,10 +17,7 @@ self.onmessage = async (event: MessageEvent<EmbedRequest>) => {
   const { id } = request;
 
   try {
-    const embedding =
-      request.kind === "image"
-        ? await embedImage(request.file)
-        : await embedText(request.query);
+    const embedding = await embedImage(request.file);
 
     self.postMessage({ id, ok: true, embedding } satisfies EmbedResponse);
   } catch (error) {

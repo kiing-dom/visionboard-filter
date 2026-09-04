@@ -28,7 +28,7 @@ Open http://localhost:3000.
 ```
 src/
 ├── app/         # routes, layout, globals
-├── components/  # ImageGrid, ImageCard, ImageImporter, SearchBar, ColorPicker…
+├── components/  # ImageGrid, ImageCard, ImageImporter, ColorPicker…
 ├── lib/         # colors, image-processing, similarity, storage
 ├── types/       # IndexedImage, RGBColor, SearchWeights
 └── workers/     # off-main-thread analysis

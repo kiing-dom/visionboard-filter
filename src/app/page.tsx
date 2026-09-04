@@ -5,7 +5,6 @@ import { ColorColumns } from "@/components/ColorColumns";
 import { ColorPicker } from "@/components/ColorPicker";
 import { ImageGrid } from "@/components/ImageGrid";
 import { ImageImporter } from "@/components/ImageImporter";
-import { SearchBar } from "@/components/SearchBar";
 import { ToleranceSlider } from "@/components/ToleranceSlider";
 import { paletteScore } from "@/lib/similarity";
 import { useAnalysis } from "@/lib/use-analysis";
@@ -48,6 +47,21 @@ export default function Home() {
     });
   }, []);
 
+  const handleSelectAll = () => {
+    const ids: string[] = [];
+
+    for (const image of images) {
+      ids.push(image.id);
+    }
+
+    setSelectedIds(new Set(ids));
+  };
+
+  const handleDelete = () => {
+    setImages(images.filter((image) => !selectedIds.has(image.id)));
+    setSelectedIds(new Set());
+  };
+
   // One column per target colour, each ranked by that colour alone. An image
   // matching several colours appears in each of them.
   const columns = useMemo(
@@ -70,8 +84,8 @@ export default function Home() {
   // reference image and by colour at the same time would be two orderings of
   // one list.
   const similar = useMemo(() => {
-    const active = similarity.sourceId !== null || similarity.query !== null;
-    if (!active || similarity.scores.size === 0) return null;
+    if (similarity.sourceId === null || similarity.scores.size === 0)
+      return null;
 
     return images
       .map((image) => ({
@@ -81,7 +95,7 @@ export default function Home() {
       .filter(({ image }) => image.id !== similarity.sourceId)
       .filter(({ image }) => similarity.scores.has(image.id))
       .sort((a, b) => b.score - a.score);
-  }, [images, similarity.sourceId, similarity.query, similarity.scores]);
+  }, [images, similarity.sourceId, similarity.scores]);
 
   // How many image/colour pairings the threshold is excluding.
   const hiddenCount = useMemo(() => {
@@ -93,19 +107,11 @@ export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">vbf</h1>
+        <h1 className="text-sm font-semibold tracking-tight">vbf</h1>
       </header>
 
       <section className="flex flex-col gap-4">
         <ImageImporter onImport={handleImport} />
-        {images.length > 0 && (
-          <SearchBar
-            onSearch={similarity.search}
-            onClear={similarity.clear}
-            active={similarity.query}
-            busy={similarity.pending > 0 || similarity.loadingModel}
-          />
-        )}
         {images.length > 0 && (
           <ColorPicker colors={targetColors} onChange={setTargetColors} />
         )}
@@ -132,12 +138,9 @@ export default function Home() {
             {!similarity.loadingModel &&
               similarity.pending > 0 &&
               ` · embedding ${similarity.pending}…`}
-            {similar &&
-              (similarity.query
-                ? ` · matching “${similarity.query}”`
-                : " · ranked by visual similarity")}
+            {similar && " · ranked by visual similarity"}
           </span>
-          {(similarity.sourceId || similarity.query) && (
+          {similarity.sourceId && (
             <button
               type="button"
               onClick={similarity.clear}
@@ -146,20 +149,41 @@ export default function Home() {
               back to all
             </button>
           )}
+          {selectedIds.size < images.length && (
+            <div>
+              <button
+                type="button"
+                className="font-medium underline underline-offset-4 opacity-70 hover:cursor-pointer hover:opacity-100"
+                onClick={handleSelectAll}
+              >
+                select all
+              </button>
+            </div>
+          )}
           {selectedIds.size > 0 && (
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="font-medium underline underline-offset-4 opacity-70 hover:opacity-100"
-            >
-              clear selection
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="font-medium underline underline-offset-4 opacity-70 hover:cursor-pointer hover:opacity-100"
+              >
+                clear selection
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="font-medium text-[#97011a] tracking-tight underline underline-offset-4 hover:cursor-pointer hover:opacity-100"
+              >
+                delete selected
+              </button>
+            </div>
           )}
         </div>
       )}
 
       {similarity.error && (
-        <p className="rounded-md border border-black/15 bg-black/[0.03] px-3 py-2 text-sm">
+        <p className="rounded-md border border-black/15 bg-black/3 px-3 py-2 text-sm">
           {similarity.error}
         </p>
       )}
@@ -192,6 +216,11 @@ export default function Home() {
           />
         )}
       </section>
+      <footer>
+        <p className="tracking-tight">
+          made by <a className="text-[#97110a] hover:underline underline-offset-4" href="https://x.com/_dngi" target="_blank">dom (@_dngi)</a>
+        </p>
+      </footer>
     </main>
   );
 }

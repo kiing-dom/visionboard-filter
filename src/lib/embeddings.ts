@@ -1,29 +1,16 @@
 import {
-  AutoTokenizer,
-  CLIPTextModelWithProjection,
   env,
   pipeline,
   type ImageFeatureExtractionPipeline,
-  type PreTrainedTokenizer,
 } from "@huggingface/transformers";
 
-/**
- * CLIP rather than a vision-only model: its image and text embeddings share a
- * space, so the same vectors we compute here power natural-language search in
- * Phase 5 without re-indexing the library.
- */
+/** CLIP's vision tower, used to rank images by visual similarity. */
 const MODEL = "Xenova/clip-vit-base-patch32";
 
 /** Weights come from the Hugging Face CDN; nothing is bundled or served by us. */
 env.allowLocalModels = false;
 
 let loading: Promise<ImageFeatureExtractionPipeline> | null = null;
-let textLoading: Promise<TextEncoder> | null = null;
-
-interface TextEncoder {
-  tokenizer: PreTrainedTokenizer;
-  model: CLIPTextModelWithProjection;
-}
 
 /**
  * Loaded on first use, not at import: the model is tens of megabytes, and the
@@ -77,40 +64,6 @@ export async function embedImage(blob: Blob): Promise<number[]> {
   } finally {
     bitmap.close();
   }
-}
-
-/**
- * The text half of CLIP. Loaded separately from the vision half because a
- * colour-only or similarity-only session never needs it.
- */
-function loadTextEncoder(): Promise<TextEncoder> {
-  if (!textLoading) {
-    textLoading = (async () => ({
-      tokenizer: await AutoTokenizer.from_pretrained(MODEL),
-      model: await CLIPTextModelWithProjection.from_pretrained(MODEL, {
-        dtype: "q8",
-      }),
-    }))();
-
-    textLoading.catch(() => {
-      textLoading = null;
-    });
-  }
-
-  return textLoading;
-}
-
-/**
- * Embeds a search phrase into the same space as the image embeddings, so the
- * two can be compared directly with `cosineSimilarity`.
- */
-export async function embedText(query: string): Promise<number[]> {
-  const { tokenizer, model } = await loadTextEncoder();
-
-  const inputs = tokenizer([query], { padding: true, truncation: true });
-  const { text_embeds } = await model(inputs);
-
-  return normalise(Array.from(text_embeds.data as Float32Array));
 }
 
 function normalise(vector: number[]): number[] {

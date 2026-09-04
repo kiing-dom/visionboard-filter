@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cosineSimilarity } from "./embeddings";
-import { normaliseScores } from "./similarity";
 import type {
   EmbedRequest,
   EmbedResponse,
@@ -12,8 +11,6 @@ import type { IndexedImage } from "@/types/image";
 export interface SimilarityState {
   /** Id of the image being compared against, if any. */
   sourceId: string | null;
-  /** The active text query, if the search came from the search bar. */
-  query: string | null;
   /** Score per image id, once computed. */
   scores: ReadonlyMap<string, number>;
   /** How many images still need embedding. */
@@ -30,7 +27,6 @@ export interface SimilarityState {
  */
 export function useSimilarity(images: IndexedImage[]) {
   const [sourceId, setSourceId] = useState<string | null>(null);
-  const [query, setQuery] = useState<string | null>(null);
   const [scores, setScores] = useState<ReadonlyMap<string, number>>(
     () => new Map(),
   );
@@ -50,7 +46,6 @@ export function useSimilarity(images: IndexedImage[]) {
 
   const clear = useCallback(() => {
     setSourceId(null);
-    setQuery(null);
     setScores(new Map());
     setError(null);
   }, []);
@@ -91,7 +86,6 @@ export function useSimilarity(images: IndexedImage[]) {
       if (!all.some((image) => image.id === id)) return;
 
       setSourceId(id);
-      setQuery(null);
       setError(null);
       setScores(new Map());
 
@@ -131,71 +125,15 @@ export function useSimilarity(images: IndexedImage[]) {
     [images, embedAll],
   );
 
-  const search = useCallback(
-    async (phrase: string) => {
-      const trimmed = phrase.trim();
-      if (trimmed === "") {
-        clear();
-        return;
-      }
-
-      const all = images.filter((image) => image.file);
-      if (all.length === 0) return;
-
-      setQuery(trimmed);
-      setSourceId(null);
-      setError(null);
-      setScores(new Map());
-
-      try {
-        const worker = await embedAll(all);
-
-        const queryVector = await embedInWorker(worker, {
-          id: `query:${trimmed}`,
-          kind: "text",
-          query: trimmed,
-        });
-
-        if (!queryVector) {
-          setError("Could not understand that search.");
-          return;
-        }
-
-        const raw = new Map(
-          all
-            .map((image): [string, number] => {
-              const vector = embeddingsRef.current.get(image.id);
-              return [
-                image.id,
-                vector ? cosineSimilarity(queryVector, vector) : 0,
-              ];
-            })
-            .filter(([, score]) => score !== 0),
-        );
-
-        // Rescaled: raw text-image scores all sit around 0.2-0.3, so the
-        // best match would otherwise read as a poor one.
-        setScores(normaliseScores(raw));
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Search failed.");
-      } finally {
-        setPending(0);
-        setLoadingModel(false);
-      }
-    },
-    [images, embedAll, clear],
-  );
-
   const state: SimilarityState = {
     sourceId,
-    query,
     scores,
     pending,
     loadingModel,
     error,
   };
 
-  return { ...state, findSimilar, search, clear };
+  return { ...state, findSimilar, clear };
 }
 
 function embedInWorker(

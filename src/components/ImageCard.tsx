@@ -109,7 +109,7 @@ export function ImageCard({
                   // lightness so adjacent similar colours stay separable.
                   isLight(entry.color)
                     ? "border-r border-black/25 last:border-r-0"
-                    : "border-r border-white/30 last:border-r-0"
+                    : "border-r last:border-r-0"
                 }`}
                 style={{ backgroundColor: hex, width: `${entry.weight * 100}%` }}
               >
@@ -141,7 +141,7 @@ export function ImageCard({
         </span>
       )}
 
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-4 text-left text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-linear-to-t from-black/70 to-transparent px-2 pb-1.5 pt-4 text-left text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
         {image.fileName}
       </span>
 

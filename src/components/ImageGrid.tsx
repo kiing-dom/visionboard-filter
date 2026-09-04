@@ -23,7 +23,7 @@ export function ImageGrid({
 }: ImageGridProps) {
   if (images.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-black/15 py-20 text-center">
+      <div className="flex flex-col items-center justify-center gap-2 rounded-lg py-20 text-center">
         <p className="text-sm font-medium">No images yet</p>
         <p className="text-sm opacity-60">
           Select images or a folder to get started.
@@ -33,7 +33,7 @@ export function ImageGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
       {images.map((image) => (
         <ImageCard
           key={image.id}
